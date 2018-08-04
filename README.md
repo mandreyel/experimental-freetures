@@ -14,6 +14,7 @@ Demonstrating how one might send and receive a message via Lora WAN.
 
 ```c++
 #include <freetures.hpp>
+#include <chrono>
 
 int main {
     ft::scheduler scheduler;
@@ -31,7 +32,7 @@ int main {
             gpio_set_level(SOME_PIN, 0);
             // Defer the invocation of this future's continuation so that the
             // hardware has time to reset.
-            return scheduler.wait(milliseconds(5));
+            return scheduler.wait(std::chrono::milliseconds(5));
         }).then([] {
             // This continuation is executed 5ms later.
             // Pull up the same pin.
@@ -42,7 +43,7 @@ int main {
             // `uart::post` also returns a future, which will eventually contain
             // the response to this command, which is passed to its `then`
             // continuation, if it exists.
-            return lora_rak.post("at+join", seconds(2));
+            return lora_rak.post("at+join", std::chrono::seconds(2));
         }).on_error([&lora_rak](std::error_code error) {
             assert(error);
             // Handle RAK/UART error here.

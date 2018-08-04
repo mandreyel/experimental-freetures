@@ -67,8 +67,8 @@ int main {
             // ...
         });
 
-    // Run the scheduler, which will actually execute ("fulfill") the above
-    // created futures and invoke their continuations.
+    // Run the scheduler, which will wait for promises associated with the above
+    // futures to be fulfilled and invoke their completion handlers.
     scheduler.run();
 }
 ```

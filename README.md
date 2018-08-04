@@ -2,9 +2,9 @@
 
 This repository encompasses an ongoing experiment in bringing a solely futures based Asio like framework to ESP devices running FreeRTOS (using [ESP-IDF](https://github.com/espressif/esp-idf)).
 
-It doesn't even work currently. Thus this repository is best regarded as a place for me to collect ideas, but not to actually deliver any working software, as I still have doubts as to whether this architecture would be a good fit for programming microcontrollers. The reason it's on github is so that I can access my ideas from other machines and perhaps share ideas with others.
+It doesn't even work currently. Thus this repository is best regarded as a place for me to collect ideas, but not to actually deliver any working software, as I still have doubts as to whether this architecture would be a good fit for programming microcontrollers. The reason it's on GitHub is so that I can access my ideas from other machines and perhaps share ideas with others.
 
-The motivation is to hopefully reduce the complexity inherent in communicating with unerliable harwarde by creating a well defined model of asynchronous execution.
+The motivation is to hopefully reduce the complexity inherent in communicating with unerliable hardware by creating a well defined model of asynchronous execution.
 
 ## Problems
 
@@ -55,12 +55,12 @@ int main()
         // the response to this command, which is passed to its `then`
         // continuation, if it exists.
         return lora_rak.post("at+join", std::chrono::seconds(2));
-    }).on_error([&lora_rak](std::error_code error) {
+    }).on_error([](std::error_code error) {
         assert(error);
         // Handle RAK/UART error here.
         // The async chain is broken, i.e. no further `then` clauses are
         // invoked.
-    }).on_timeout([&lora_rak] {
+    }).on_timeout([] {
         // Handle RAK timeout here.
         // The async chain is broken, i.e. no further `then` clauses are
         // invoked.
@@ -70,7 +70,7 @@ int main()
         return lora_rak.post("at+send,somedata", seconds(1));
     }).then([&lora_rak](std::string response) {
         // Send empty command to listen to response
-        return lora_rak.post("", seconds(9));
+        return lora_rak.post("", std::chrono::seconds(9));
     }).then([](std::string response) {
         // Received Lora WAN response; handle it.
         // ...

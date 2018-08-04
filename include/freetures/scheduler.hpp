@@ -4,12 +4,13 @@
 #include "time.hpp"
 #include "future.hpp"
 #include "detail/type_traits.hpp"
-//#include "detail/scheduler.hpp"
+#include "detail/scheduler.hpp"
 
 namespace ft {
 
 class scheduler
 {
+    detail::scheduler impl_;
 public:
     /**
      * @brief Posts a function for invocation by @ref run.
@@ -40,7 +41,10 @@ public:
         typename F,
         typename R = typename detail::callable_traits<F, void>::inner_result_type,
         typename = typename std::enable_if<detail::is_callable<F>::value>::type
-    > future<R> post(F&& f);
+    > future<R> post(F&& f)
+    {
+        return impl_.post(std::forward<F>(f));
+    }
 
     /**
      * @brief Posts a function for invocation by @ref run that will be invoked
@@ -61,7 +65,10 @@ public:
         typename F,
         typename R = typename detail::callable_traits<F, void>::inner_result_type,
         typename = typename std::enable_if<detail::is_callable<F>::value>::type
-    > future<R> defer(F&& f, duration delay);
+    > future<R> defer(F&& f, duration delay)
+    {
+        return impl_.defer(std::forward<F>(f), delay);
+    }
 
     /**
      * @brief Posts a function for invocation by @ref run that will be invoked
@@ -77,8 +84,8 @@ public:
      * 
      * @param f The function which will be executed by @p run. It is guaranteed
      * not to be invoked from within this function.
-     * @param repeat_interval The interval that defines how frequently @p is
-     * going to be invoked.
+     * @param frequency The interval that defines how frequently @p is going to
+     * be invoked.
      *
      * @return Since the function is repeatedly invoked, no future is returned,
      * since attaching a continuation would not make sense.
@@ -86,7 +93,10 @@ public:
     template<
         typename F,
         typename = typename std::enable_if<detail::is_callable<F>::value>::type
-    > void repeat(F&& f, duration repeat_interval);
+    > void repeat(F&& f, duration frequency)
+    {
+        impl_.repeat(std::forward<F>(f), frequency);
+    }
 
     /**
      * @brief Returns a future that may be used to delay its continuation by @p
@@ -107,7 +117,10 @@ public:
      *
      * @
      */
-    future<void> wait(duration delay);
+    future<void> wait(duration delay)
+    {
+        return impl_.wait(delay);
+    }
 
     /**
      * @brief Runs the scheduler's event processing loop.
@@ -116,9 +129,15 @@ public:
      * This means that asynchronous events *must* be registered before calling
      * run, otherwise the application will never start.
      */
-    void run();
+    void run()
+    {
+        impl_.run();
+    }
 
-    void stop();
+    void stop()
+    {
+        impl_.stop();
+    }
 };
 
 } // ft

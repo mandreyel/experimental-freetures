@@ -1,4 +1,5 @@
 #include "../include/freetures.hpp"
+#include <iostream>
 
 int main()
 {

@@ -41,6 +41,7 @@ class shared_state
         timed_out,
     } status_ = not_ready;
 
+    //T result;
     //continuation<T> continuation_;
     //??? on_error_;
     //??? on_timeout_;

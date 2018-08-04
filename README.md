@@ -21,58 +21,60 @@ demonstrating how one might send and receive a message via Lora WAN.
 
 ```c++
 #include <freetures.hpp>
+#include <system_error>
 #include <chrono>
+#include <string>
 
-int main {
+int main()
+{
     ft::scheduler scheduler;
+    // Set UART config...
     ft::uart::config conf;
-    // TODO: set UART config.
+    // Each object that wishes to provide a future-based asynchronous interface
+    // takes a reference to a scheduler.
     ft::uart lora_rak(scheduler, conf);
-    std::string data = "...";
 
     // None of the below commands are executed: they're just "registered" as
     // operations and they'll be executed once the scheduler is run (see below).
 
     // `scheduler::post` returns a future.
     scheduler.post([&scheduler] {
-            // Reset the hardware by pulling down the corresponding pin.
-            gpio_set_level(SOME_PIN, 0);
-            // Defer the invocation of this future's continuation so that the
-            // hardware has time to reset.
-            return scheduler.wait(std::chrono::milliseconds(5));
-        }).then([] {
-            // This continuation is executed 5ms later.
-            // Pull up the same pin.
-            gpi_set_level(SOME_PIN, 1);
-        }).then([&lora_rak] {
-            // Now we are ready to use the UART channel to communicate with the
-            // Lora RAK module.
-            // `uart::post` also returns a future, which will eventually contain
-            // the response to this command, which is passed to its `then`
-            // continuation, if it exists.
-            return lora_rak.post("at+join", std::chrono::seconds(2));
-        }).on_error([&lora_rak](std::error_code error) {
-            assert(error);
-            // Handle RAK/UART error here.
-            // The async chain is broken, i.e. no further `then` clauses are
-            // invoked.
-        }).on_timeout([&lora_rak] {
-            // Handle RAK timeout here.
-            // The async chain is broken, i.e. no further `then` clauses are
-            // invoked.
-        }).then([&lora_rak, &data](std::string response) {
-            assert(response == "OK\r\n");
-            // The response to "at+join" is passed to this continuation.
-            // Send next command.
-            return lora_rak.post(std::string("at+send,") + data, seconds(1));
-        }).then([&lora_rak](std::string response) {
-            assert(response == "OK\r\n");
-            // Send empty command to listen to response
-            return lora_rak.post("", seconds(9));
-        }).then([](std::string response) {
-            // Received Lora WAN response, handle it.
-            // ...
-        });
+        // Reset the hardware by pulling down the corresponding pin.
+        gpio_set_level(SOME_PIN, 0);
+        // Defer the invocation of this future's continuation so that the
+        // hardware has time to reset.
+        return scheduler.wait(std::chrono::milliseconds(5));
+    }).then([] {
+        // This continuation is executed 5ms later.
+        // Pull up the same pin.
+        gpio_set_level(SOME_PIN, 1);
+    }).then([&lora_rak] {
+        // Now we are ready to use the UART channel to communicate with the
+        // Lora RAK module.
+        // `uart::post` also returns a future, which will eventually contain
+        // the response to this command, which is passed to its `then`
+        // continuation, if it exists.
+        return lora_rak.post("at+join", std::chrono::seconds(2));
+    }).on_error([&lora_rak](std::error_code error) {
+        assert(error);
+        // Handle RAK/UART error here.
+        // The async chain is broken, i.e. no further `then` clauses are
+        // invoked.
+    }).on_timeout([&lora_rak] {
+        // Handle RAK timeout here.
+        // The async chain is broken, i.e. no further `then` clauses are
+        // invoked.
+    }).then([&lora_rak, &data](std::string response) {
+        // The response to "at+join" is passed to this continuation.
+        // Send next command.
+        return lora_rak.post("at+send,somedata", seconds(1));
+    }).then([&lora_rak](std::string response) {
+        // Send empty command to listen to response
+        return lora_rak.post("", seconds(9));
+    }).then([](std::string response) {
+        // Received Lora WAN response; handle it.
+        // ...
+    });
 
     // Run the scheduler, which will wait for promises associated with the above
     // futures to be fulfilled and invoke their completion handlers.

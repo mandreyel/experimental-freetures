@@ -1,16 +1,18 @@
 # experimental-freetures
 
-This repository encompasses an ongoing experiment in bringing a solely futures based Asio like framework to ESP devices running FreeRTOS (using ESP-IDF).
+This repository encompasses an ongoing experiment in bringing a solely futures based Asio like framework to ESP devices running FreeRTOS (using [ESP-IDF](https://github.com/espressif/esp-idf)).
 
 It doesn't even work currently. Thus this repository is best regarded as a place for me to collect ideas, but not to actually deliver any working software, as I still have doubts as to whether this architecture would be a good fit for programming microcontrollers. The reason it's on github is so that I can access my ideas from other machines and perhaps share ideas with others.
 
-The motivation is to hopefully reduce the complexity inherent in communicating with unerliable harwarde by creating a well defined model of asynchronous operations.
+The motivation is to hopefully reduce the complexity inherent in communicating with unerliable harwarde by creating a well defined model of asynchronous execution.
 
-It is inspired by Asio in that it uses `select(2)` to poll for ready file descriptors. The problem with this approach is that it can only be used with UART and traditional BSD sockets, but modules such as WiFi, BLE and others that don't expose a POSIX compliant API cannot be integrated into this framework. I haven't yet come up with a solution, but it looks like VFS can be used to map such a module's API to a POSIX compliant descriptor based API. Another solution would be to make scheduler aware of this and handle non-descriptor based entities in a separate thread and somehow tie it together in an application.
+It is inspired by Asio in that it uses `select(2)` to poll for ready file descriptors. The problem with this approach is that it can only be used with UART and traditional BSD sockets, which expose a descriptor based API, but modules such as WiFi, BLE and others that don't expose such an API cannot be integrated into this framework.
+I haven't yet come up with a solution, but it looks like [VFS](https://github.com/espressif/esp-idf/tree/master/components/vfs) can be used to map such a module's API to a POSIX compliant descriptor based API. Another solution would be to make scheduler aware of this and handle non-descriptor based entities in a separate thread and somehow tie it all together to expose a unified interface.
+Programming is tough.
 
 ## Example usage
 
-Demonstrating how one might send and receive a message via Lora WAN.
+demonstrating how one might send and receive a message via Lora WAN.
 
 ```c++
 #include <freetures.hpp>

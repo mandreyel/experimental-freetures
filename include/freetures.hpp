@@ -3,5 +3,6 @@
 
 #include "freetures/future.hpp"
 #include "freetures/promise.hpp"
+#include "freetures/scheduler.hpp"
 
 #endif

@@ -6,6 +6,7 @@
 
 #include "../future.hpp"
 #include "../promise.hpp"
+#include "reactor.hpp"
 #include "type_traits.hpp"
 
 namespace ft {
@@ -34,8 +35,13 @@ class scheduler
 {
     // The queue of fulfilled promises that are ready to be delivered.
     std::deque<std::unique_ptr<ready_promise>> ready_promises_;
+    reactor reactor_;
 
 public:
+    scheduler()
+        : reactor_(*this)
+    {}
+
     template<
         typename F,
         typename R = typename detail::callable_traits<F, void>::inner_result_type,

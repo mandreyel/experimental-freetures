@@ -4,6 +4,8 @@
 int main()
 {
     ft::scheduler scheduler;
+    ft::uart::config conf;
+    ft::uart uart(scheduler, conf);
 
     ft::promise<int> p;
     ft::future<int> f = p.get_future();

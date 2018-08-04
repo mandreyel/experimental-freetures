@@ -4,5 +4,7 @@
 #include "freetures/future.hpp"
 #include "freetures/promise.hpp"
 #include "freetures/scheduler.hpp"
+#include "freetures/time.hpp"
+#include "freetures/uart.hpp"
 
 #endif

@@ -8,6 +8,7 @@ The motivation is to hopefully reduce the complexity inherent in communicating w
 
 It is inspired by Asio in that it uses `select(2)` to poll for ready file descriptors. The problem with this approach is that it can only be used with UART and traditional BSD sockets, which expose a descriptor based API, but modules such as WiFi, BLE and others that don't expose such an API cannot be integrated into this framework.
 I haven't yet come up with a solution, but it looks like [VFS](https://github.com/espressif/esp-idf/tree/master/components/vfs) can be used to map such a module's API to a POSIX compliant descriptor based API. Another solution would be to make scheduler aware of this and handle non-descriptor based entities in a separate thread and somehow tie it all together to expose a unified interface.
+The other significant problem is managing timers, because their FreeRTOS equivalent, too, does not expose a descriptor based interface--the main reason why the ESP-IDF port of [Asio](https://github.com/espressif/esp-idf/tree/master/components/asio) is not a practical solution (because it assumes a descriptor based API for OS timers exists). I think this will have to be solved by a separate thread managed by the scheduler, but I haven't gotten that far yet.
 Programming is tough.
 
 ## Example usage

@@ -15,7 +15,7 @@ namespace detail {
 
 struct ready_promise
 {
-    virtual void invoke_continuation() = 0;
+    virtual void invoke_handler() = 0;
     virtual ~ready_promise() {}
 };
 
@@ -24,8 +24,9 @@ struct concrete_ready_promise final : public ready_promise
 {
     promise<T> p;
 
-    void invoke_continuation() override
+    void invoke_handler() override
     {
+        p.invoke_handler();
     }
 };
 
@@ -83,6 +84,9 @@ public:
     void stop()
     {
     }
+
+    template<typename T>
+    void post_ready_promise(promise<T> p);
 };
 
 } // detail

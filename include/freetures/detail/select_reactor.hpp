@@ -51,7 +51,7 @@ public:
         : scheduler_(s)
     {}
 
-    //future<void> start_read_op(descriptor_data& data)
+    //void_future start_read_op(descriptor_data& data)
     //{
         //// if shutting down, post immediate completion with error
         //// enqueue operation in fd_sets_ and if its the first operation for this
@@ -60,7 +60,7 @@ public:
         //// learn about any events for this descriptor)
     //}
 
-    //future<void> start_write_op(descriptor_data& data)
+    //void_future start_write_op(descriptor_data& data)
     //{
     //}
 

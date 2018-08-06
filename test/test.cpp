@@ -9,7 +9,7 @@ int main()
 
     scheduler
         .wait(std::chrono::seconds(5))
-        .then([] { return 5; })
+        .then([](ft::null_tag) { return 5; })
         .then([](int delay) {
             std::cout << "here after " << delay << " seconds\n";
         });

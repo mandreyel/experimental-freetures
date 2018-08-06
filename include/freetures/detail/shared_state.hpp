@@ -38,23 +38,26 @@ public:
     }
 };
 
-template<>
-class continuation<null_tag>
-{
-    std::function<void()> handler_;
+// TODO For now, due to some complications, null future continuations must take
+// a null_tag argument (which they should ignore). This will be fixed later, but
+// it facilitates quicker iteration.
+//template<>
+//class continuation<null_tag>
+//{
+    //std::function<void()> handler_;
 
-public:
-    continuation() = default;
+//public:
+    //continuation() = default;
 
-    template<typename Handler>
-    continuation(Handler&& h)
-        : handler_(std::forward<Handler>(h))
-    {}
+    //template<typename Handler>
+    //continuation(Handler&& h)
+        //: handler_(std::forward<Handler>(h))
+    //{}
 
-    void operator()(null_tag) {
-        handler_();
-    }
-};
+    //void operator()(null_tag) {
+        //handler_();
+    //}
+//};
 
 template<typename T>
 class shared_state
@@ -113,7 +116,7 @@ public:
         status_ = timed_out;
     }
 
-    void register_continuation(continuation<T>&& c)
+    void attach_continuation(continuation<T>&& c)
     {
         switch(status_) {
         case not_ready:

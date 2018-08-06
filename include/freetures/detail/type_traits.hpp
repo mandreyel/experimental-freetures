@@ -130,13 +130,13 @@ struct callable_traits
     constexpr static const bool returns_future = is_future<result_type>::value;
 };
 
-template<class F>
-struct callable_traits<F, null_tag>
-{
-    using result_type = typename std::result_of<F()>::type;
-    using inner_result_type = typename detail::inner_result_type<result_type>::type;
-    constexpr static const bool returns_future = is_future<result_type>::value;
-};
+//template<class F>
+//struct callable_traits<F, null_tag>
+//{
+    //using result_type = typename std::result_of<F()>::type;
+    //using inner_result_type = typename detail::inner_result_type<result_type>::type;
+    //constexpr static const bool returns_future = is_future<result_type>::value;
+//};
 
 } // ft
 

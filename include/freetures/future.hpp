@@ -32,6 +32,9 @@ namespace ft {
 template<typename T>
 struct future
 {
+    static_assert(not std::is_same<T, void>::value,
+            "future<void> is not supported, use void_future instead");
+
     template<typename U>
     friend class future;
 
@@ -67,12 +70,34 @@ public:
         typename HandlerTraits = callable_traits<Handler, T>,
         typename U = typename HandlerTraits::inner_result_type,
         typename = typename std::enable_if<
-            is_callable<Handler>::value
+            not std::is_same<U, void>::value
+            //is_callable<Handler>::value
             //and accepts_args<Handler, T>::value
         >::type
     > future<U> then(Handler&& h)
     {
-        return register_continuation<Handler>(std::forward<Handler>(h));
+        return attach_continuation<Handler>(std::forward<Handler>(h));
+    }
+
+    /**
+     * @brief Specialization for handlers that return void.
+     *
+     * The handler is wrapped in a handler that returns `null_tag`.
+     */
+    template<
+        typename Handler,
+        typename HandlerTraits = callable_traits<Handler, T>,
+        typename U = typename HandlerTraits::inner_result_type
+    > auto then(Handler&& h)
+        -> typename std::enable_if<
+            std::is_same<U, void>::value,
+            future<null_tag>
+        >::type
+    {
+        return attach_continuation<Handler>([h](T t) -> null_tag {
+            h(std::move(t));
+            return null_tag();
+        });
     }
 
     /**
@@ -100,7 +125,7 @@ public:
     template<typename Handler>
     future<T>& on_error(Handler&& h)
     {
-        return register_error_handler<Handler>(std::forward<Handler>(h));
+        return attach_error_handler<Handler>(std::forward<Handler>(h));
     }
 
     /**
@@ -131,7 +156,7 @@ public:
     template<typename Handler>
     future<T>& on_timeout(Handler&& h)
     {
-        return register_timeout_handler<Handler>(std::forward<Handler>(h));
+        return attach_timeout_handler<Handler>(std::forward<Handler>(h));
     }
 
 private:
@@ -141,9 +166,9 @@ private:
     template<
         typename Handler,
         typename HandlerTraits = callable_traits<Handler, T>,
-        typename U = typename HandlerTraits::inner_result_type,
-        typename = typename std::enable_if<HandlerTraits::returns_future>::type
-    > future<U> register_continuation(Handler&& h)
+        typename U = typename HandlerTraits::inner_result_type
+    > auto attach_continuation(Handler&& handler)
+        -> typename std::enable_if<HandlerTraits::returns_future, future<U>>::type
     {
         auto state = state_.lock();
         if(!state) {
@@ -163,7 +188,7 @@ private:
         // them.
         promise<U> bogus_handler_promise(state->get_scheduler());
         auto bogus_handler_future = bogus_handler_promise.get_future();
-        detail::continuation<U> cont([this, bogus_handler_promise, handler](T&& t)
+        detail::continuation<U> cont([this, bogus_handler_promise, handler](T&& t) mutable
         {
             // Invoke the handler with the result to retrieve its future.
             auto handler_future = handler(std::forward<T>(t));
@@ -187,7 +212,7 @@ private:
             bogus_state->move_handlers_to(*handler_state);
         });
 
-        state->register_continuation(std::move(cont));
+        state->attach_continuation(std::move(cont));
 
         return bogus_handler_future;
     }
@@ -204,9 +229,9 @@ private:
     template<
         typename Handler,
         typename HandlerTraits = callable_traits<Handler, T>,
-        typename U = typename HandlerTraits::inner_result_type,
-        typename = typename std::enable_if<not HandlerTraits::returns_future>::type
-    > future<U> register_continuation(Handler&& h)
+        typename U = typename HandlerTraits::inner_result_type
+    > auto attach_continuation(Handler&& handler)
+        -> typename std::enable_if<not HandlerTraits::returns_future, future<U>>::type
     {
         auto state = state_.lock();
         if(!state) {
@@ -219,13 +244,13 @@ private:
         // scheduler of this future.
         promise<U> handler_promise(state->get_scheduler());
         auto handler_future = handler_promise.get_future();
-        detail::continuation<U> cont([handler_promise, h](T&& t)
+        detail::continuation<U> cont([handler_promise, handler](T&& t) mutable
         {
-            auto result = h(std::move(t));
+            auto result = handler(std::move(t));
             // Since this continuation is only invoked if no error or timeout
             // occurred, `t` is valid, which needs to be passed to
             // `handler_future`.
-            handler_promise.set_value(result);
+            handler_promise.set_value(std::move(result));
             // Since handler returns a value the promise effectively immdiately
             // becomes fulfilled, notify `handler_future`'s executor that this
             // promise has been fulfilled  so that its continuation can be
@@ -233,51 +258,71 @@ private:
             auto future = handler_promise.get_future();
             auto state = future.state_.lock();
             assert(state);
-            state->get_scheduler().post_ready_promise(std::move(promise));
+            state->get_scheduler().post_ready_promise(std::move(handler_promise));
         });
 
-        state->register_continuation(std::move(cont));
+        state->attach_continuation(std::move(cont));
 
         return handler_future;
     }
 
-    //template<
-        //typename Handler,
-        //typename HandlerTraits = callable_traits<Handler, T>,
-        //typename U = typename HandlerTraits::inner_result_type,
-        //typename = typename std::enable_if<HandlerTraits::returns_future>::type
-    //> future<T> register_error_handler(Handler&& h)
-    //{
-    //}
-
+    /**
+     * @brief Specialization for an `on_error` continuation variant that returns
+     * a future.
+     */
     template<
         typename Handler,
         typename HandlerTraits = callable_traits<Handler, T>,
-        typename U = typename HandlerTraits::inner_result_type,
-        typename = typename std::enable_if<not HandlerTraits::returns_future>::type
-    > future<T> register_error_handler(Handler&& h)
+        typename U = typename HandlerTraits::inner_result_type
+    > auto attach_error_handler(Handler&& handler)
+        -> typename std::enable_if<HandlerTraits::returns_future, future<U>>::type
     {
     }
 
-    //template<
-        //typename Handler,
-        //typename HandlerTraits = callable_traits<Handler, T>,
-        //typename U = typename HandlerTraits::inner_result_type,
-        //typename = typename std::enable_if<HandlerTraits::returns_future>::type
-    //> future<T> register_timeout_handler(Handler&& h)
-    //{
-    //}
-
+    /**
+     * @brief Specialization for an `on_error` continuation variant that returns
+     * a value.
+     */
     template<
         typename Handler,
         typename HandlerTraits = callable_traits<Handler, T>,
-        typename U = typename HandlerTraits::inner_result_type,
-        typename = typename std::enable_if<not HandlerTraits::returns_future>::type
-    > future<T> register_timeout_handler(Handler&& h)
+        typename U = typename HandlerTraits::inner_result_type
+    > auto attach_error_handler(Handler&& handler)
+        -> typename std::enable_if<not HandlerTraits::returns_future, future<U>>::type
+    {
+    }
+
+    /**
+     * @brief Specialization for an `on_timeout` continuation variant that returns
+     * a future.
+     */
+    template<
+        typename Handler,
+        typename HandlerTraits = callable_traits<Handler, T>,
+        typename U = typename HandlerTraits::inner_result_type
+    > auto attach_timeout_handler(Handler&& h)
+        -> typename std::enable_if<HandlerTraits::returns_future, future<U>>::type
+    {
+    }
+
+    /**
+     * @brief Specialization for an `on_timeout` continuation variant that returns
+     * a value.
+     */
+    template<
+        typename Handler,
+        typename HandlerTraits = callable_traits<Handler, T>,
+        typename U = typename HandlerTraits::inner_result_type
+    > auto attach_timeout_handler(Handler&& h)
+        -> typename std::enable_if<not HandlerTraits::returns_future, future<U>>::type
     {
     }
 };
 
+/**
+ * @brief A future that is not associated with a value, i.e. the operation that
+ * returns it would return `void`.
+ */
 using void_future = future<null_tag>;
 
 } // ft

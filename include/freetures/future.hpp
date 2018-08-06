@@ -64,11 +64,11 @@ public:
      */
     template<
         typename Handler,
-        typename HandlerTraits = detail::callable_traits<Handler, T>,
+        typename HandlerTraits = callable_traits<Handler, T>,
         typename U = typename HandlerTraits::inner_result_type,
         typename = typename std::enable_if<
-            detail::is_callable<Handler>::value and
-            detail::accepts_args<Handler, T>::value
+            is_callable<Handler>::value
+            //and accepts_args<Handler, T>::value
         >::type
     > future<U> then(Handler&& h)
     {
@@ -140,7 +140,7 @@ private:
      */
     template<
         typename Handler,
-        typename HandlerTraits = detail::callable_traits<Handler, T>,
+        typename HandlerTraits = callable_traits<Handler, T>,
         typename U = typename HandlerTraits::inner_result_type,
         typename = typename std::enable_if<HandlerTraits::returns_future>::type
     > future<U> register_continuation(Handler&& h)
@@ -200,15 +200,10 @@ private:
      * future in which it is going to be wrapped immediately becomes ready. The
      * reason it is wrapped in a future is so the continuation chain is not
      * broken.
-     *
-     * However, this means that the entire promise-shared_state-future trio
-     * needs to be constructed in place, meaning the promise is moved into its
-     * own `shared_state`. Due to using a `std::shared_ptr`, this introduces
-     * a reference cycle, which is taken care of within `shared_state`.
      */
     template<
         typename Handler,
-        typename HandlerTraits = detail::callable_traits<Handler, T>,
+        typename HandlerTraits = callable_traits<Handler, T>,
         typename U = typename HandlerTraits::inner_result_type,
         typename = typename std::enable_if<not HandlerTraits::returns_future>::type
     > future<U> register_continuation(Handler&& h)
@@ -248,7 +243,7 @@ private:
 
     //template<
         //typename Handler,
-        //typename HandlerTraits = detail::callable_traits<Handler, T>,
+        //typename HandlerTraits = callable_traits<Handler, T>,
         //typename U = typename HandlerTraits::inner_result_type,
         //typename = typename std::enable_if<HandlerTraits::returns_future>::type
     //> future<T> register_error_handler(Handler&& h)
@@ -257,7 +252,7 @@ private:
 
     template<
         typename Handler,
-        typename HandlerTraits = detail::callable_traits<Handler, T>,
+        typename HandlerTraits = callable_traits<Handler, T>,
         typename U = typename HandlerTraits::inner_result_type,
         typename = typename std::enable_if<not HandlerTraits::returns_future>::type
     > future<T> register_error_handler(Handler&& h)
@@ -266,7 +261,7 @@ private:
 
     //template<
         //typename Handler,
-        //typename HandlerTraits = detail::callable_traits<Handler, T>,
+        //typename HandlerTraits = callable_traits<Handler, T>,
         //typename U = typename HandlerTraits::inner_result_type,
         //typename = typename std::enable_if<HandlerTraits::returns_future>::type
     //> future<T> register_timeout_handler(Handler&& h)
@@ -275,7 +270,7 @@ private:
 
     template<
         typename Handler,
-        typename HandlerTraits = detail::callable_traits<Handler, T>,
+        typename HandlerTraits = callable_traits<Handler, T>,
         typename U = typename HandlerTraits::inner_result_type,
         typename = typename std::enable_if<not HandlerTraits::returns_future>::type
     > future<T> register_timeout_handler(Handler&& h)
@@ -283,7 +278,7 @@ private:
     }
 };
 
-using void_future = future<detail::null_tag>;
+using void_future = future<null_tag>;
 
 } // ft
 

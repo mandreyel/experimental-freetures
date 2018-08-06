@@ -5,44 +5,72 @@ namespace ft {
 
 template<class> class future;
 template<class> class promise;
-class void_tag {};
+class null_tag {};
 
 namespace detail {
-
-template<class F>
-struct is_callable
-{
-    // TODO
-    constexpr static const bool value = true;
-};
-
-template<class T>
-struct is_future : std::false_type {};
-
-template<class T>
-struct is_future<future<T>> : std::true_type {};
-
-/** Determines whether the callable `F` can accept arguments of type `Args...`. */
-template<class F, typename... Args>
-struct accepts_args;
-
-template<class F, typename... Args>
-struct accepts_args
-{
-    // TODO
-    constexpr static const bool value = true;
-};
-
 //------------------------------------------------------------------------------
-/** Extracts the type that a future returns. */
-template<class T>
-struct future_result;
+// From: http://talesofcpp.fusionfenix.com/post-11/true-story-call-me-maybe
+template <typename T>
+using always_void = void;
 
-template<class T>
-struct future_result<future<T>>
-{
-    using type = T;
-};
+template <typename Expr, std::size_t Step = 0, typename Enable = void>
+struct is_callable_impl
+  : is_callable_impl<Expr, Step + 1>
+{};
+
+// (t1.*f)(t2, ..., tN) when f is a pointer to a member function of a class T 
+// and t1 is an object of type T or a reference to an object of type T or a 
+// reference to an object of a type derived from T;
+template <typename F, typename T, typename ...Args>
+struct is_callable_impl<F(T, Args...), 0,
+    always_void<decltype(
+        (std::declval<T>().*std::declval<F>())(std::declval<Args>()...)
+    )>
+> : std::true_type
+{};
+
+// ((*t1).*f)(t2, ..., tN) when f is a pointer to a member function of a class T 
+// and t1 is not one of the types described in the previous item;
+template <typename F, typename T, typename ...Args>
+struct is_callable_impl<F(T, Args...), 1,
+    always_void<decltype(
+        ((*std::declval<T>()).*std::declval<F>())(std::declval<Args>()...)
+    )>
+> : std::true_type
+{};
+
+// t1.*f when N == 1 and f is a pointer to member data of a class T and t1 is an 
+// object of type T or a reference to an object of type T or a reference to an 
+// object of a type derived from T;
+template <typename F, typename T>
+struct is_callable_impl<F(T), 2,
+    always_void<decltype(
+        std::declval<T>().*std::declval<F>()
+    )>
+> : std::true_type
+{};
+
+// (*t1).*f when N == 1 and f is a pointer to member data of a class T and t1 is 
+// not one of the types described in the previous item;
+template <typename F, typename T>
+struct is_callable_impl<F(T), 3,
+    always_void<decltype(
+        (*std::declval<T>()).*std::declval<F>()
+    )>
+> : std::true_type
+{};
+
+// f(t1, t2, ..., tN) in all other cases.
+template <typename F, typename ...Args>
+struct is_callable_impl<F(Args...), 4,
+    always_void<decltype(
+        std::declval<F>()(std::declval<Args>()...)
+    )>
+> : std::true_type
+{};
+
+template <typename Expr>
+struct is_callable_impl<Expr, 5> : std::false_type {};
 
 //------------------------------------------------------------------------------
 /**
@@ -62,6 +90,30 @@ struct inner_result_type<future<T>>
     using type = T;
 };
 
+} // detail
+
+//------------------------------------------------------------------------------
+template<class T>
+struct is_future : std::false_type {};
+
+template<class T>
+struct is_future<future<T>> : std::true_type {};
+
+//------------------------------------------------------------------------------
+/** Extracts the type that a future returns. */
+template<class T>
+struct future_result;
+
+template<class T>
+struct future_result<future<T>>
+{
+    using type = T;
+};
+
+//------------------------------------------------------------------------------
+template <typename Expr>
+struct is_callable : detail::is_callable_impl<Expr> {};
+
 //------------------------------------------------------------------------------
 /**
  * Type traits for callable types used as continuations for futures.
@@ -74,7 +126,7 @@ template<class F, class Arg>
 struct callable_traits
 {
     using result_type = typename std::result_of<F(Arg)>::type;
-    using inner_result_type = typename inner_result_type<result_type>::type;
+    using inner_result_type = typename detail::inner_result_type<result_type>::type;
     constexpr static const bool returns_future = is_future<result_type>::value;
 };
 
@@ -82,11 +134,10 @@ template<class F>
 struct callable_traits<F, null_tag>
 {
     using result_type = typename std::result_of<F()>::type;
-    using inner_result_type = typename inner_result_type<result_type>::type;
+    using inner_result_type = typename detail::inner_result_type<result_type>::type;
     constexpr static const bool returns_future = is_future<result_type>::value;
 };
 
-} // detail
 } // ft
 
 #endif

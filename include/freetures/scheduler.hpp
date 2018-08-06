@@ -39,8 +39,8 @@ public:
      */
     template<
         typename F,
-        typename R = typename detail::callable_traits<F, void>::inner_result_type,
-        typename = typename std::enable_if<detail::is_callable<F>::value>::type
+        typename R = typename callable_traits<F, void>::inner_result_type,
+        typename = typename std::enable_if<is_callable<F>::value>::type
     > future<R> post(F&& f)
     {
         return impl_.post(std::forward<F>(f));
@@ -63,8 +63,8 @@ public:
      */
     template<
         typename F,
-        typename R = typename detail::callable_traits<F, void>::inner_result_type,
-        typename = typename std::enable_if<detail::is_callable<F>::value>::type
+        typename R = typename callable_traits<F, void>::inner_result_type,
+        typename = typename std::enable_if<is_callable<F>::value>::type
     > future<R> defer(F&& f, duration delay)
     {
         return impl_.defer(std::forward<F>(f), delay);
@@ -92,7 +92,7 @@ public:
      */
     template<
         typename F,
-        typename = typename std::enable_if<detail::is_callable<F>::value>::type
+        typename = typename std::enable_if<is_callable<F>::value>::type
     > void repeat(F&& f, duration frequency)
     {
         impl_.repeat(std::forward<F>(f), frequency);

@@ -6,7 +6,7 @@
 
 #include "future.hpp"
 #include "detail/shared_state.hpp"
-#include "detail/type_trais.hpp"
+#include "detail/type_traits.hpp"
 
 namespace ft {
 
@@ -30,7 +30,7 @@ public:
 
     template<
         typename U = T,
-        typename = typename std::enable_if<not std::is_same<T, null_tag>::type
+        typename = typename std::enable_if<not std::is_same<T, null_tag>::value>::type
     > void set_value(T&& t)
     {
         state_->set_value(std::move(t));
@@ -38,7 +38,7 @@ public:
 
     template<
         typename U = T,
-        typename = typename std::enable_if<std::is_same<T, null_tag>::type
+        typename = typename std::enable_if<std::is_same<T, null_tag>::value>::type
     > void set_value()
     {
         state_->set_value(null_tag());

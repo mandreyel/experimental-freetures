@@ -28,9 +28,8 @@ public:
     continuation() = default;
 
     template<typename Handler>
-    continuation(promise<T> p, Handler&& h)
-        : promise_(std::move(p))
-        , handler_(std::forward<Handler>(h))
+    continuation(Handler&& h)
+        : handler_(std::forward<Handler>(h))
     {}
 
     template<typename U>
@@ -48,13 +47,12 @@ public:
     continuation() = default;
 
     template<typename Handler>
-    continuation(promise<T> p, Handler&& h)
-        : promise_(std::move(p))
-        , handler_(std::forward<Handler>(h))
+    continuation(Handler&& h)
+        : handler_(std::forward<Handler>(h))
     {}
 
     void operator()(null_tag) {
-        handler();
+        handler_();
     }
 };
 

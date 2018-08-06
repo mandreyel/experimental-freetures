@@ -137,6 +137,7 @@ public:
 private:
     /**
      * @brief Specialization for a `then` continuation variant that returns a future.
+     */
     template<
         typename Handler,
         typename HandlerTraits = detail::callable_traits<Handler, T>,
@@ -156,23 +157,24 @@ private:
         // associated promise) do not yet exist (since the future is returned by
         // handler, which hasn't run). Thus we create a bogus future-promise
         // pair, to which a continuation and possibly error and timeout handlers
-        // may be chained, and when this continuation is invoked, we transfer
-        // these handlers to the actual future the handler returns. 
-
+        // may be attached, and when this continuation is invoked, we transfer
+        // these handlers to the actual future the handler returns, so that the
+        // scheduler associated with the future returned by handler can execute
+        // them.
         promise<U> bogus_handler_promise(state->get_scheduler());
-        auto bogus_handler_future = p.get_future();
-
-        state->register_continuation([bogus_handler_promise, handler](T&& r)
+        auto bogus_handler_future = bogus_handler_promise.get_future();
+        detail::continuation<U> cont([this, bogus_handler_promise, handler](T&& t)
         {
             // Invoke the handler with the result to retrieve its future.
-            auto handler_future = handler(std::forward<T>(r));
+            auto handler_future = handler(std::forward<T>(t));
             auto handler_state = handler_future.state_.lock();
             if(!handler_state) {
                 // TODO
+                assert(0);
                 return;
             }
 
-            // Grab the futuer associated with our bogus promise so that we can
+            // Grab the future associated with our bogus promise so that we can
             // access its shared state.
             auto bogus_handler_future = bogus_handler_promise.get_future();
             auto bogus_state = bogus_handler_future.state_.lock();
@@ -185,9 +187,10 @@ private:
             bogus_state->move_handlers_to(*handler_state);
         });
 
+        state->register_continuation(std::move(cont));
+
         return bogus_handler_future;
     }
-     */
 
     /**
      * @brief Specialization for a `then` continuation variant that returns
@@ -221,18 +224,24 @@ private:
         // scheduler of this future.
         promise<U> handler_promise(state->get_scheduler());
         auto handler_future = handler_promise.get_future();
+        detail::continuation<U> cont([handler_promise, h](T&& t)
+        {
+            auto result = h(std::move(t));
+            // Since this continuation is only invoked if no error or timeout
+            // occurred, `t` is valid, which needs to be passed to
+            // `handler_future`.
+            handler_promise.set_value(result);
+            // Since handler returns a value the promise effectively immdiately
+            // becomes fulfilled, notify `handler_future`'s executor that this
+            // promise has been fulfilled  so that its continuation can be
+            // invoked.
+            auto future = handler_promise.get_future();
+            auto state = future.state_.lock();
+            assert(state);
+            state->get_scheduler().post_ready_promise(std::move(promise));
+        });
 
-        //state->register_continuation([handler_promise](T&& r)
-        //{
-            //// Since this continuation is only invoked if no error or timeout
-            //// occurred, `r` is valid, which needs to be passed to
-            //// `handler_future`.
-            //handler_promise.set_value(std::move(r));
-            //// Now, notify the associated executor that this promise has been
-            //// fulfilled so that its associatd future's (`handler_future`)
-            //// continuation can be invoked.
-            ////handler_promise TODO
-        //});
+        state->register_continuation(std::move(cont));
 
         return handler_future;
     }
@@ -274,8 +283,7 @@ private:
     }
 };
 
-class null_future_tag {};
-using null_future = future<null_future_tag>;
+using void_future = future<detail::null_tag>;
 
 } // ft
 

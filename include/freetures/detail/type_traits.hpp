@@ -5,6 +5,7 @@ namespace ft {
 
 template<class> class future;
 template<class> class promise;
+class void_tag {};
 
 namespace detail {
 
@@ -78,7 +79,7 @@ struct callable_traits
 };
 
 template<class F>
-struct callable_traits<F, void>
+struct callable_traits<F, null_tag>
 {
     using result_type = typename std::result_of<F()>::type;
     using inner_result_type = typename inner_result_type<result_type>::type;

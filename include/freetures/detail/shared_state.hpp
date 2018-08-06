@@ -15,10 +15,13 @@ namespace detail {
 
 using namespace tl;
 
+/**
+ * This class handles the variation between a void future and a normal future
+ * (void future's handler does not take an argument).
+ */
 template<typename T>
 class continuation
 {
-    promise<T> promise_;
     std::function<void(T)> handler_;
 
 public:
@@ -32,6 +35,26 @@ public:
 
     template<typename U>
     void operator()(U&& u) {
+        handler_(std::forward<U>(u));
+    }
+};
+
+template<>
+class continuation<null_tag>
+{
+    std::function<void()> handler_;
+
+public:
+    continuation() = default;
+
+    template<typename Handler>
+    continuation(promise<T> p, Handler&& h)
+        : promise_(std::move(p))
+        , handler_(std::forward<Handler>(h))
+    {}
+
+    void operator()(null_tag) {
+        handler();
     }
 };
 
@@ -107,6 +130,9 @@ public:
 
     void move_handlers_to(shared_state& other)
     {
+        if(this == &other) {
+            return;
+        }
     }
 
     void invoke_handler()

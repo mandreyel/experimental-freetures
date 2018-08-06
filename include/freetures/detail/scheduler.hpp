@@ -72,7 +72,7 @@ public:
     {
     }
 
-    //null_future wait(duration delay)
+    //void_future wait(duration delay)
     //{
     //}
 

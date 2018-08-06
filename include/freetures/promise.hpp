@@ -6,6 +6,7 @@
 
 #include "future.hpp"
 #include "detail/shared_state.hpp"
+#include "detail/type_trais.hpp"
 
 namespace ft {
 
@@ -27,9 +28,20 @@ public:
     /** Returns a future associated with this promise. */
     future<T> get_future() { return {state_}; }
 
-    void set_value(T&& t)
+    template<
+        typename U = T,
+        typename = typename std::enable_if<not std::is_same<T, null_tag>::type
+    > void set_value(T&& t)
     {
         state_->set_value(std::move(t));
+    }
+
+    template<
+        typename U = T,
+        typename = typename std::enable_if<std::is_same<T, null_tag>::type
+    > void set_value()
+    {
+        state_->set_value(null_tag());
     }
 
     void set_error(std::error_code error)

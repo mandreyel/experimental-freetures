@@ -6,7 +6,6 @@
 
 #include "future.hpp"
 #include "detail/shared_state.hpp"
-#include "detail/scheduler.hpp"
 
 namespace ft {
 
@@ -16,6 +15,8 @@ class promise
     std::shared_ptr<detail::shared_state<T>> state_;
 
 public:
+    promise() = default;
+
     /**
      * Constructs the promise and its associated shared state.
      */
@@ -43,7 +44,7 @@ public:
 
     bool is_ready() const
     {
-        return state->is_ready();
+        return state_->is_ready();
     }
 
     /**
@@ -57,45 +58,45 @@ public:
      */
     void invoke_handler()
     {
-        state->invoke_handler();
+        state_->invoke_handler();
     }
 };
 
 /** @brief Void specialization. */
-template<>
-class promise<void>
-{
-    std::shared_ptr<detail::shared_state<void>> state_;
+//template<>
+//class promise<void>
+//{
+    //std::shared_ptr<detail::shared_state<void>> state_;
 
-public:
+//public:
     /**
      * Constructs the promise and its associated shared state.
      */
-    explicit promise(detail::scheduler& s)
-        : state_(std::make_shared<detail::shared_state<T>>(s))
-    {}
+    //explicit promise(detail::scheduler& s)
+        //: state_(std::make_shared<detail::shared_state<void>>(s))
+    //{}
 
-    /** Returns a future associated with this promise. */
-    future<void> get_future() { return {state_}; }
+    //[>* Returns a future associated with this promise. <]
+    //future<void> get_future() { return {state_}; }
 
-    void set_error(std::error_code error)
-    {
-        state_->set_error(error);
-    }
+    //void set_error(std::error_code error)
+    //{
+        //state_->set_error(error);
+    //}
 
-    void set_timeout()
-    {
-        state_->set_timeout();
-    }
+    //void set_timeout()
+    //{
+        //state_->set_timeout();
+    //}
 
     /**
      * Returns true if promise has a value, an error or a timeout associated
      * with it.
      */
-    bool is_ready() const
-    {
-        return state->is_ready();
-    }
+    //bool is_ready() const
+    //{
+        //return state_->is_ready();
+    //}
 
     /**
      * @brief Invokes the appropriate handler depending on whether prmoise has
@@ -106,11 +107,12 @@ public:
      *
      * @throw If promise is not ready, an exception is thrown. TODO which?
      */
-    void invoke_handler()
-    {
-        state->invoke_handler();
-    }
-};
+    //void invoke_handler()
+    //{
+        //state_->invoke_handler();
+    //}
+//};
+
 } // ft
 
 #endif

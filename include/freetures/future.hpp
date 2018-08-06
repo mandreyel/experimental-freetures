@@ -100,7 +100,7 @@ public:
     template<typename Handler>
     future<T>& on_error(Handler&& h)
     {
-        return register_error_handler(std::forward<Handler>(h));
+        return register_error_handler<Handler>(std::forward<Handler>(h));
     }
 
     /**
@@ -131,7 +131,7 @@ public:
     template<typename Handler>
     future<T>& on_timeout(Handler&& h)
     {
-        return register_timeout_handler(std::forward<Handler>(h));
+        return register_timeout_handler<Handler>(std::forward<Handler>(h));
     }
 
 private:
@@ -220,7 +220,7 @@ private:
         // means that we'll have to associate this new promise with the
         // scheduler of this future.
         promise<U> handler_promise(state->get_scheduler());
-        auto handler_future = p.get_future();
+        auto handler_future = handler_promise.get_future();
 
         //state->register_continuation([handler_promise](T&& r)
         //{
@@ -237,35 +237,45 @@ private:
         return handler_future;
     }
 
-    // TODO
-    template<
-        typename Handler,
-        typename HandlerTraits = detail::callable_traits<Handler, T>,
-        typename U = typename HandlerTraits::inner_result_type,
-        typename = typename std::enable_if<HandlerTraits::returns_future>::type
-    > future<T> register_error_handler(std::forward<Handler>(h));
+    //template<
+        //typename Handler,
+        //typename HandlerTraits = detail::callable_traits<Handler, T>,
+        //typename U = typename HandlerTraits::inner_result_type,
+        //typename = typename std::enable_if<HandlerTraits::returns_future>::type
+    //> future<T> register_error_handler(Handler&& h)
+    //{
+    //}
 
     template<
         typename Handler,
         typename HandlerTraits = detail::callable_traits<Handler, T>,
         typename U = typename HandlerTraits::inner_result_type,
         typename = typename std::enable_if<not HandlerTraits::returns_future>::type
-    > future<T> register_error_handler(std::forward<Handler>(h));
+    > future<T> register_error_handler(Handler&& h)
+    {
+    }
 
-    template<
-        typename Handler,
-        typename HandlerTraits = detail::callable_traits<Handler, T>,
-        typename U = typename HandlerTraits::inner_result_type,
-        typename = typename std::enable_if<HandlerTraits::returns_future>::type
-    > future<T> register_timeout_handler(std::forward<Handler>(h));
+    //template<
+        //typename Handler,
+        //typename HandlerTraits = detail::callable_traits<Handler, T>,
+        //typename U = typename HandlerTraits::inner_result_type,
+        //typename = typename std::enable_if<HandlerTraits::returns_future>::type
+    //> future<T> register_timeout_handler(Handler&& h)
+    //{
+    //}
 
     template<
         typename Handler,
         typename HandlerTraits = detail::callable_traits<Handler, T>,
         typename U = typename HandlerTraits::inner_result_type,
         typename = typename std::enable_if<not HandlerTraits::returns_future>::type
-    > future<T> register_timeout_handler(std::forward<Handler>(h));
+    > future<T> register_timeout_handler(Handler&& h)
+    {
+    }
 };
+
+class null_future_tag {};
+using null_future = future<null_future_tag>;
 
 } // ft
 

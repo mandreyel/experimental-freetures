@@ -6,6 +6,7 @@
 
 #include "../future.hpp"
 #include "../promise.hpp"
+#include "../time.hpp"
 #include "reactor.hpp"
 #include "type_traits.hpp"
 
@@ -61,7 +62,7 @@ public:
         typename = typename std::enable_if<detail::is_callable<F>::value>::type
     > future<R> defer(F&& f, duration delay)
     {
-        return wait(delay).then(std::forward(f));
+        //return wait(delay).then(std::forward(f));
     }
 
     template<
@@ -71,9 +72,9 @@ public:
     {
     }
 
-    future<void> wait(duration delay)
-    {
-    }
+    //null_future wait(duration delay)
+    //{
+    //}
 
     void run()
     {

@@ -117,9 +117,9 @@ public:
      *
      * @
      */
-    future<void> wait(duration delay)
+    null_future wait(duration delay)
     {
-        return impl_.wait(delay);
+        //return impl_.wait(delay);
     }
 
     /**

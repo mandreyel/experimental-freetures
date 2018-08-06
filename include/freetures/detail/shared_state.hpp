@@ -111,7 +111,7 @@ public:
 
     void invoke_handler()
     {
-        if(status == not_ready) {
+        if(status_ == not_ready) {
             throw "cannot invoke handler on not ready promise";
         }
 

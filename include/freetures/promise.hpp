@@ -6,6 +6,7 @@
 
 #include "future.hpp"
 #include "detail/shared_state.hpp"
+#include "detail/scheduler.hpp"
 
 namespace ft {
 
@@ -18,20 +19,46 @@ public:
     /**
      * Constructs the promise and its associated shared state.
      */
-    promise() : state_(std::make_shared<detail::shared_state<T>>()) {}
+    explicit promise(detail::scheduler& s)
+        : state_(std::make_shared<detail::shared_state<T>>(s))
+    {}
+
+    /** Returns a future associated with this promise. */
+    future<T> get_future() { return {state_}; }
+
+    void set_value(T&& t)
+    {
+        state_->set_value(std::move(t));
+    }
+
+    void set_error(std::error_code error)
+    {
+        state_->set_error(error);
+    }
+
+    void set_timeout()
+    {
+        state_->set_timeout();
+    }
+
+    bool is_ready() const
+    {
+        return state->is_ready();
+    }
 
     /**
-     * @brief Returns a future associated with this promise.
+     * @brief Invokes the appropriate handler depending on whether prmoise has
+     * a value, an error, or if it has timed out.
+     *
+     * @note This function should be invoked by the scheduler associated with
+     * this promise.
+     *
+     * @throw If promise is not ready, an exception is thrown. TODO which?
      */
-    future<T> get_future();
-
-    void set_value(T&& t);
-    void set_error(std::error_code& error);
-    void set_timeout();
-
-    bool is_fulfilled() const;
-
-    void invoke_handler();
+    void invoke_handler()
+    {
+        state->invoke_handler();
+    }
 };
 
 /** @brief Void specialization. */
@@ -44,20 +71,45 @@ public:
     /**
      * Constructs the promise and its associated shared state.
      */
-    promise() : state_(std::make_shared<detail::shared_state<void>>()) {}
+    explicit promise(detail::scheduler& s)
+        : state_(std::make_shared<detail::shared_state<T>>(s))
+    {}
+
+    /** Returns a future associated with this promise. */
+    future<void> get_future() { return {state_}; }
+
+    void set_error(std::error_code error)
+    {
+        state_->set_error(error);
+    }
+
+    void set_timeout()
+    {
+        state_->set_timeout();
+    }
 
     /**
-     * @brief Returns a future associated with this promise.
+     * Returns true if promise has a value, an error or a timeout associated
+     * with it.
      */
-    future<void> get_future();
+    bool is_ready() const
+    {
+        return state->is_ready();
+    }
 
-    void set_value();
-    void set_error(std::error_code& error);
-    void set_timeout();
-
-    bool is_fulfilled() const;
-
-    void invoke_handler();
+    /**
+     * @brief Invokes the appropriate handler depending on whether prmoise has
+     * a value, an error, or if it has timed out.
+     *
+     * @note This function should be invoked by the scheduler associated with
+     * this promise.
+     *
+     * @throw If promise is not ready, an exception is thrown. TODO which?
+     */
+    void invoke_handler()
+    {
+        state->invoke_handler();
+    }
 };
 } // ft
 

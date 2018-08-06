@@ -29,18 +29,24 @@ namespace ft {
  *     });
  * @endcode
  */
-template<typename R>
+template<typename T>
 struct future
 {
-    std::weak_ptr<detail::shared_state<R>> state_;
+    template<typename U>
+    friend class future;
+
+    std::weak_ptr<detail::shared_state<T>> state_;
 
 public:
+    // TODO cleaner API
+    explicit future(std::weak_ptr<detail::shared_state<T>> state) : state_(state) {}
+
     /**
      * @brief Sets a handler to be invoked with the result of the future, once
      * the it is ready.
      *
-     * If the handler returns a value, it is wrapped in a future. If it does
-     * not, the return value is unaltered. TODO more lucid explanation
+     * If the handler returns a value, it is wrapped in a future. If it returns
+     * a future, sucha a future (not the same one, of course) is returned.
      *
      * @code
      * future<int> async_operation();
@@ -51,26 +57,29 @@ public:
      *     });
      * @endcode
      *
-     * @param h The handler, which must accept a single parameter of `R`, that
+     * @param h The handler, which must accept a single parameter of `T`, that
      * is chained to this future.
      *
      * @return A future that will contain the return value of the handler.
      */
     template<
         typename Handler,
-        typename HandlerTraits = detail::callable_traits<Handler, R>,
-        typename R2 = typename HandlerTraits::inner_result_type,
+        typename HandlerTraits = detail::callable_traits<Handler, T>,
+        typename U = typename HandlerTraits::inner_result_type,
         typename = typename std::enable_if<
             detail::is_callable<Handler>::value and
-            detail::accepts_args<Handler, R>::value
+            detail::accepts_args<Handler, T>::value
         >::type
-    > future<R2> then(Handler&& h)
+    > future<U> then(Handler&& h)
     {
-        return register_continuation<Handler, HandlerTraits>(std::forward<Handler>(h));
+        return register_continuation<Handler>(std::forward<Handler>(h));
     }
 
     /**
      * @brief Sets a handler to be invoked if the future resulted in an error.
+     *
+     * Handler must return either a future wrapping the same type as this future
+     * (i.e. `future<T>`), or a value of type T.
      *
      * @code
      * future<int> async_operation();
@@ -89,10 +98,16 @@ public:
      * @return A reference to `*this`.
      */
     template<typename Handler>
-    future<R>& on_error(Handler&& h);
+    future<T>& on_error(Handler&& h)
+    {
+        return register_error_handler(std::forward<Handler>(h));
+    }
 
     /**
      * @brief Sets a handler to be invoked if the future has timed out.
+     *
+     * Handler must return either a future wrapping the same type as this future
+     * (i.e. `future<T>`), or a value of type T.
      *
      * @code
      * future<int> async_operation();
@@ -114,18 +129,63 @@ public:
      * @return A reference to `*this`.
      */
     template<typename Handler>
-    future<R>& on_timeout(Handler&& h);
+    future<T>& on_timeout(Handler&& h)
+    {
+        return register_timeout_handler(std::forward<Handler>(h));
+    }
 
 private:
     /**
      * @brief Specialization for a `then` continuation variant that returns a future.
     template<
         typename Handler,
-        typename HandlerTraits,
-        typename R2 = typename HandlerTraits::inner_result_type,
+        typename HandlerTraits = detail::callable_traits<Handler, T>,
+        typename U = typename HandlerTraits::inner_result_type,
         typename = typename std::enable_if<HandlerTraits::returns_future>::type
-    > future<R2> register_continuation(Handler&& h)
+    > future<U> register_continuation(Handler&& h)
     {
+        auto state = state_.lock();
+        if(!state) {
+            throw "TODO add proper exception";
+        }
+
+        // Handler returns a future, which means that it already has an
+        // associated promise (only promises can create futures).
+        //
+        // The tricky part, however, is that this future (and thus its
+        // associated promise) do not yet exist (since the future is returned by
+        // handler, which hasn't run). Thus we create a bogus future-promise
+        // pair, to which a continuation and possibly error and timeout handlers
+        // may be chained, and when this continuation is invoked, we transfer
+        // these handlers to the actual future the handler returns. 
+
+        promise<U> bogus_handler_promise(state->get_scheduler());
+        auto bogus_handler_future = p.get_future();
+
+        state->register_continuation([bogus_handler_promise, handler](T&& r)
+        {
+            // Invoke the handler with the result to retrieve its future.
+            auto handler_future = handler(std::forward<T>(r));
+            auto handler_state = handler_future.state_.lock();
+            if(!handler_state) {
+                // TODO
+                return;
+            }
+
+            // Grab the futuer associated with our bogus promise so that we can
+            // access its shared state.
+            auto bogus_handler_future = bogus_handler_promise.get_future();
+            auto bogus_state = bogus_handler_future.state_.lock();
+            // This shouldn't happen.
+            if(!bogus_state) { assert(0); }
+
+            // Then move any handlers registered with the bogus future to the
+            // actual future. This way, when the future returned by handler will
+            // become ready, the scheduler can call them.
+            bogus_state->move_handlers_to(*handler_state);
+        });
+
+        return bogus_handler_future;
     }
      */
 
@@ -145,24 +205,66 @@ private:
      */
     template<
         typename Handler,
-        typename HandlerTraits,
-        typename R2 = typename HandlerTraits::inner_result_type,
+        typename HandlerTraits = detail::callable_traits<Handler, T>,
+        typename U = typename HandlerTraits::inner_result_type,
         typename = typename std::enable_if<not HandlerTraits::returns_future>::type
-    > future<R2> register_continuation(Handler&& h)
+    > future<U> register_continuation(Handler&& h)
     {
         auto state = state_.lock();
         if(!state) {
             throw "TODO add proper exception";
         }
 
-        promise<R2> p;
-        future<R2> f = p.get_future();
-        detail::continuation<R2> cont(std::move(p), std::forward<Handler>(h));
+        // Since handler returns a value, we need to create the promise
+        // ourselves. Usually promises are created directly by schedulers, so this
+        // means that we'll have to associate this new promise with the
+        // scheduler of this future.
+        promise<U> handler_promise(state->get_scheduler());
+        auto handler_future = p.get_future();
 
-        state->register_continuation(std::move(cont));
+        //state->register_continuation([handler_promise](T&& r)
+        //{
+            //// Since this continuation is only invoked if no error or timeout
+            //// occurred, `r` is valid, which needs to be passed to
+            //// `handler_future`.
+            //handler_promise.set_value(std::move(r));
+            //// Now, notify the associated executor that this promise has been
+            //// fulfilled so that its associatd future's (`handler_future`)
+            //// continuation can be invoked.
+            ////handler_promise TODO
+        //});
 
-        return f;
+        return handler_future;
     }
+
+    // TODO
+    template<
+        typename Handler,
+        typename HandlerTraits = detail::callable_traits<Handler, T>,
+        typename U = typename HandlerTraits::inner_result_type,
+        typename = typename std::enable_if<HandlerTraits::returns_future>::type
+    > future<T> register_error_handler(std::forward<Handler>(h));
+
+    template<
+        typename Handler,
+        typename HandlerTraits = detail::callable_traits<Handler, T>,
+        typename U = typename HandlerTraits::inner_result_type,
+        typename = typename std::enable_if<not HandlerTraits::returns_future>::type
+    > future<T> register_error_handler(std::forward<Handler>(h));
+
+    template<
+        typename Handler,
+        typename HandlerTraits = detail::callable_traits<Handler, T>,
+        typename U = typename HandlerTraits::inner_result_type,
+        typename = typename std::enable_if<HandlerTraits::returns_future>::type
+    > future<T> register_timeout_handler(std::forward<Handler>(h));
+
+    template<
+        typename Handler,
+        typename HandlerTraits = detail::callable_traits<Handler, T>,
+        typename U = typename HandlerTraits::inner_result_type,
+        typename = typename std::enable_if<not HandlerTraits::returns_future>::type
+    > future<T> register_timeout_handler(std::forward<Handler>(h));
 };
 
 } // ft

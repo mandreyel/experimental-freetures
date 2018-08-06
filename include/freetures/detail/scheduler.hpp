@@ -42,6 +42,11 @@ public:
         : reactor_(*this)
     {}
 
+    reactor& get_reactor() noexcept
+    {
+        return reactor_;
+    }
+
     template<
         typename F,
         typename R = typename detail::callable_traits<F, void>::inner_result_type,
